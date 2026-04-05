@@ -1,0 +1,26 @@
+# 生成物（GitHub Actionsで生成されるため管理外）
+output/data.json
+output/index.html
+output/review.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.env
+
+# macOS
+.DS_Store
+
+# 課題用の参考ファイル（リポジトリ管理外）
+*.png
+*.numbers
+
+# 秘密情報（絶対にコミットしない）
+*.json
+!output/.gitkeep
+credentials*.json
+service_account*.json

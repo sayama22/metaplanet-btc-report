@@ -1,0 +1,11 @@
+# データ収集
+requests>=2.31.0
+yfinance>=0.2.36
+feedparser>=6.0.11
+
+# Google Sheets
+gspread>=6.1.2
+google-auth>=2.29.0
+
+# AI レビュー (Gemini)
+google-generativeai>=0.7.2

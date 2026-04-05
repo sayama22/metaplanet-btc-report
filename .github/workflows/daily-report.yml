@@ -1,0 +1,227 @@
+name: 📊 メタプラネット×BTC デイリーレポート
+
+on:
+  # 毎日 JST 10:00 (UTC 01:00) に自動実行
+  schedule:
+    - cron: '0 1 * * *'
+  # 手動実行も可能
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────
+  # Job 1: データ収集 → Google Sheets 保存
+  # ─────────────────────────────────────────
+  collect:
+    name: 1️⃣ データ収集
+    runs-on: ubuntu-latest
+    outputs:
+      date: ${{ steps.meta.outputs.date }}
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 依存関係をインストール
+        run: pip install -r requirements.txt
+
+      - name: データ収集を実行
+        env:
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python scripts/1_collect_data.py
+
+      - name: 日付メタデータを出力
+        id: meta
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: output/ をアーティファクトとして保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-data
+          path: output/
+          retention-days: 7
+
+  # ─────────────────────────────────────────
+  # Job 2: HTMLレポート生成
+  # ─────────────────────────────────────────
+  generate:
+    name: 2️⃣ HTMLレポート生成
+    runs-on: ubuntu-latest
+    needs: collect
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 依存関係をインストール
+        run: pip install -r requirements.txt
+
+      - name: アーティファクトをダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: report-data
+          path: output/
+
+      - name: HTMLレポートを生成
+        run: python scripts/2_generate_report.py
+
+      - name: output/ をアーティファクトとして保存（HTML追加後）
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-html
+          path: output/
+          retention-days: 7
+
+  # ─────────────────────────────────────────
+  # Job 3: AIサブエージェント レビュー
+  # ─────────────────────────────────────────
+  review:
+    name: 3️⃣ AIサブエージェント レビュー
+    runs-on: ubuntu-latest
+    needs: generate
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 依存関係をインストール
+        run: pip install -r requirements.txt
+
+      - name: アーティファクトをダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: report-html
+          path: output/
+
+      - name: AIレビューを実行（Gemini 1.5 Flash）
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/3_review_report.py
+
+      - name: output/ をアーティファクトとして保存（レビュー後）
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-reviewed
+          path: output/
+          retention-days: 7
+
+  # ─────────────────────────────────────────
+  # Job 4: Surge にデプロイ
+  # ─────────────────────────────────────────
+  deploy:
+    name: 4️⃣ Surge デプロイ
+    runs-on: ubuntu-latest
+    needs: review
+
+    steps:
+      - name: アーティファクトをダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: report-reviewed
+          path: output/
+
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Surge CLI をインストール
+        run: npm install -g surge
+
+      - name: Surge にデプロイ
+        env:
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+          SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
+        run: |
+          surge --project ./output \
+                --domain ${SURGE_DOMAIN:-metaplanet-btc-report.surge.sh} \
+                --token $SURGE_TOKEN
+
+      - name: デプロイ完了メッセージ
+        run: echo "✅ デプロイ完了: https://${SURGE_DOMAIN:-metaplanet-btc-report.surge.sh}"
+
+  # ─────────────────────────────────────────
+  # Job 5: LINE 通知
+  # ─────────────────────────────────────────
+  notify:
+    name: 5️⃣ LINE通知
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 をセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 依存関係をインストール
+        run: pip install -r requirements.txt
+
+      - name: アーティファクトをダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          name: report-reviewed
+          path: output/
+
+      - name: LINE通知を送信
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
+        run: python scripts/4_notify_line.py
+
+  # ─────────────────────────────────────────
+  # Job 6: 失敗通知（全Job失敗時のみ）
+  # ─────────────────────────────────────────
+  on-failure:
+    name: ⚠️ エラー通知
+    runs-on: ubuntu-latest
+    needs: [collect, generate, review, deploy, notify]
+    if: failure()
+
+    steps:
+      - name: LINE にエラー通知を送信
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: |
+          python -c "
+          import os, json, requests
+          token = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN')
+          user_id = os.environ.get('LINE_USER_ID')
+          if not token or not user_id:
+              print('LINE credentials not set, skipping error notification')
+              exit(0)
+          payload = {
+              'to': user_id,
+              'messages': [{'type': 'text', 'text': '⚠️ デイリーレポートの自動生成でエラーが発生しました。\nGitHub Actionsのログを確認してください。\nhttps://github.com/${{ github.repository }}/actions'}]
+          }
+          resp = requests.post(
+              'https://api.line.me/v2/bot/message/push',
+              headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
+              data=json.dumps(payload), timeout=30
+          )
+          print(f'LINE error notification: {resp.status_code}')
+          "

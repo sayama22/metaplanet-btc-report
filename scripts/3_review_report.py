@@ -123,7 +123,7 @@ def main():
     genai.configure(api_key=api_key)
 
     # Gemini 1.5 Flash (無料枠)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
 
     data = load_data()
     prompt = build_prompt(data)

@@ -155,10 +155,10 @@ jobs:
                 --domain ${SURGE_DOMAIN:-metaplanet-btc-report.surge.sh} \
                 --token $SURGE_TOKEN
 
-        - name: デプロイ完了メッセージ
-          run: echo "Deploy complete: https://${SURGE_DOMAIN:-metaplanet-btc-report}.surge.sh"
+      - name: デプロイ完了メッセージ
+        run: echo "Deploy complete: https://${SURGE_DOMAIN:-metaplanet-btc-report}.surge.sh"
 
-    
+
 
   # ─────────────────────────────────────────
   # Job 5: LINE 通知

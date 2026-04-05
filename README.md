@@ -52,7 +52,7 @@ git commit -m "initial commit"
 # GitHubでリポジトリを作成（パブリック推奨）
 # https://github.com/new
 
-git remote add origin https://github.com/あなたのユーザー名/リポジトリ名.git
+git remote add origin https://github.com/sayama22/BTC.git
 git push -u origin main
 ```
 

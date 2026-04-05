@@ -80,6 +80,8 @@ def send_line_message(payload: dict) -> None:
 
 def main():
     surge_domain = os.environ.get("SURGE_DOMAIN", "metaplanet-btc-report.surge.sh")
+    if not surge_domain.endswith(".surge.sh"):
+        surge_domain = f"{surge_domain}.surge.sh"
     surge_url = f"https://{surge_domain}"
 
     print(f"=== LINE通知送信開始 ===")
